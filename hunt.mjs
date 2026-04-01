@@ -5,6 +5,34 @@ import { execSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 
+// ─── constants & helpers ─────────────────────────────────────────────────────
+
+const RESULT_PATH = homedir() + '/.shiny-hunter-result.json'
+
+function showHelp() {
+  console.log(`Usage: hunt.mjs [options]
+
+Options:
+  --help, -h    Show this help message and exit
+  --restore     Restore the last saved buddy result and inject it
+
+When run without flags, starts an interactive hunt session.
+`)
+  process.exit(0)
+}
+
+function saveResult(userId, buddyName, bones) {
+  writeFileSync(RESULT_PATH, JSON.stringify({ userId, buddyName, bones }, null, 2))
+}
+
+function loadResult() {
+  try {
+    return JSON.parse(readFileSync(RESULT_PATH, 'utf8'))
+  } catch {
+    return null
+  }
+}
+
 // ─── buddy roll engine ────────────────────────────────────────────────────────
 
 const SALT = 'friend-2026-401'
@@ -196,6 +224,27 @@ Answer each question or press Enter to skip (any).
 `)
 
 async function main() {
+  const args = process.argv.slice(2)
+
+  if (args.includes('--help') || args.includes('-h')) {
+    rl.close()
+    showHelp()
+  }
+
+  if (args.includes('--restore')) {
+    rl.close()
+    const saved = loadResult()
+    if (!saved) {
+      console.error('No saved result found. Run a hunt first.')
+      process.exit(1)
+    }
+    console.log('\nRestoring saved buddy:')
+    console.log(display(saved.bones))
+    inject(saved.userId, saved.buddyName)
+    console.log('\nRestored! Restart Claude and type /buddy.\n')
+    process.exit(0)
+  }
+
   const filters = {}
 
   // species
@@ -295,6 +344,7 @@ async function main() {
 
   // inject
   inject(found.userId, buddyName)
+  saveResult(found.userId, buddyName, found.bones)
 
   // check for macOS keychain token
   const token = getOAuthToken()
