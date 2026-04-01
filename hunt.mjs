@@ -137,17 +137,32 @@ function parseChoice(input, items) {
 
 // ─── inject ───────────────────────────────────────────────────────────────────
 
-function getOAuthToken() {
+function detectAuth() {
+  // Check if OAuth account exists in ~/.claude.json
+  let hasOAuth = false
   try {
-    const raw = execSync(
-      'security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null',
-      { encoding: 'utf8' }
-    ).trim()
-    const parsed = JSON.parse(raw)
-    return parsed?.claudeAiOauth?.accessToken ?? null
-  } catch {
-    return null
+    const config = JSON.parse(readFileSync(homedir() + '/.claude.json', 'utf8'))
+    hasOAuth = !!config.oauthAccount?.accountUuid
+  } catch { /* no config or parse error */ }
+
+  // On macOS, try Keychain for OAuth token
+  if (process.platform === 'darwin') {
+    try {
+      const raw = execSync(
+        'security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null',
+        { encoding: 'utf8' }
+      ).trim()
+      const parsed = JSON.parse(raw)
+      const token = parsed?.claudeAiOauth?.accessToken ?? null
+      if (token) return { type: 'oauth', hasOAuth: true, token }
+    } catch { /* no keychain entry */ }
   }
+
+  // Fall back to JSON-based OAuth detection (all platforms)
+  if (hasOAuth) return { type: 'oauth', hasOAuth: true, token: null }
+
+  // API key user
+  return { type: 'api', hasOAuth: false, token: null }
 }
 
 function inject(userId, name) {
@@ -187,6 +202,42 @@ function display(bones) {
 
   ${statsLine}
 `
+}
+
+function printPostInject() {
+  const auth = detectAuth()
+  if (auth.type === 'oauth' && auth.token) {
+    // macOS with Keychain token
+    console.log(`
+Applied! Now start Claude using:
+
+  CLAUDE_CODE_OAUTH_TOKEN="${auth.token.slice(0, 12)}..." claude
+
+Or if you have the claude-buddy wrapper script, just use that.
+Then type /buddy to meet your new companion.
+
+Tip: re-run with --restore to reapply this buddy later.
+`)
+  } else if (auth.type === 'oauth') {
+    // Linux/Windows — OAuth without Keychain token
+    console.log(`
+Applied! Warning: logging in via OAuth will overwrite the buddy userID.
+
+To preserve it, set CLAUDE_CODE_OAUTH_TOKEN in your environment before
+launching Claude. See the README for the full workaround.
+
+Then type /buddy to meet your new companion.
+
+Tip: re-run with --restore to reapply this buddy later.
+`)
+  } else {
+    // API key user
+    console.log(`
+Applied! Restart Claude and type /buddy.
+
+Tip: re-run with --restore to reapply this buddy later.
+`)
+  }
 }
 
 // ─── estimate difficulty ──────────────────────────────────────────────────────
@@ -241,7 +292,7 @@ async function main() {
     console.log('\nRestoring saved buddy:')
     console.log(display(saved.bones))
     inject(saved.userId, saved.buddyName)
-    console.log('\nRestored! Restart Claude and type /buddy.\n')
+    printPostInject()
     process.exit(0)
   }
 
@@ -346,24 +397,7 @@ async function main() {
   inject(found.userId, buddyName)
   saveResult(found.userId, buddyName, found.bones)
 
-  // check for macOS keychain token
-  const token = getOAuthToken()
-  if (token) {
-    console.log(`
-Applied! Now start Claude using:
-
-  CLAUDE_CODE_OAUTH_TOKEN="${token.slice(0, 12)}..." claude
-
-Or if you have the claude-buddy wrapper script, just use that.
-Then type /buddy to meet your new companion.
-`)
-  } else {
-    console.log(`
-Applied! Restart Claude and type /buddy.
-Note: if you log in via OAuth, accountUuid may overwrite the buddy.
-See the README for the full workaround.
-`)
-  }
+  printPostInject()
 }
 
 main().catch(e => { console.error(e.message); process.exit(1) })
