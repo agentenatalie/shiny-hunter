@@ -7,9 +7,16 @@
 
 [English](./README.md)
 
-找到你心仪的 Claude Code 伙伴。
+Claude Code 的伙伴是根据你的用户 ID 哈希决定的。你没得选。**直到现在。**
 
-> Claude Code 会根据用户 ID 的哈希值，为每位用户随机生成一个伙伴生物。物种、稀有度、帽子、眼睛和属性值都由此哈希决定。**shiny-hunter** 通过暴力搜索，找到一个能生成你理想伙伴的用户 ID，并将其写入 `~/.claude.json`。
+```
+  ┌──────────────────────────────────┐
+  │       ✨  shiny-hunter  ✨        │
+  │   find your perfect Claude buddy  │
+  └──────────────────────────────────┘
+```
+
+就像宝可梦里反复软重启刷闪光御三家一样 -- 只不过这次不用你亲自按键，CPU 替你按。选好梦想中的物种、稀有度、帽子、眼睛和属性，剩下的交给暴力搜索。
 
 ## 快速开始
 
@@ -17,88 +24,96 @@
 npx shiny-hunter
 ```
 
+回答 7 个问题，等一会儿，认识你的新伙伴。就这么简单。
+
 ```bash
-npx shiny-hunter --restore   # 重新应用已保存的伙伴
-npx shiny-hunter --help
+npx shiny-hunter --restore   # 伙伴被覆盖了？一条命令找回来
+npx shiny-hunter --help      # 给谨慎的朋友们准备的
 ```
 
-或者克隆后直接运行：
+想先看完每一行代码再用？尊重：
 
 ```bash
 git clone https://github.com/agentenatalie/shiny-hunter.git
 node shiny-hunter/hunt.mjs
 ```
 
-搜索完成后，重启 Claude Code 并输入 `/buddy` 即可见到你的伙伴。
+搜索完成后，重启 Claude Code，输入 `/buddy` 即可。
 
-## 可选属性
+## 菜单
 
-| 属性 | 选项 |
-|------|------|
-| **Species** (18 种) | duck, goose, blob, cat, dragon, octopus, owl, penguin, turtle, snail, ghost, axolotl, capybara, cactus, robot, rabbit, mushroom, chonk |
-| **Rarity** | common (60%), uncommon (25%), rare (10%), epic (4%), legendary (1%) |
-| **Shiny** | yes / no / any (每次投掷 1% 概率) |
-| **Hat** | none, crown, tophat, propeller, halo, wizard, beanie, tinyduck |
-| **Eyes** | · ✦ × ◉ @ ° |
-| **Peak stat** | DEBUGGING, PATIENCE, CHAOS, WISDOM, SNARK |
-| **Name** | 自由输入 (与生成的候选名称进行匹配) |
+| 属性 | 选项 | 备注 |
+|------|------|------|
+| **Species** | duck, goose, blob, cat, dragon, octopus, owl, penguin, turtle, snail, ghost, axolotl, capybara, cactus, robot, rabbit, mushroom, chonk | 18 种生物。没错，chonk 也是一个物种。 |
+| **Rarity** | common, uncommon, rare, epic, legendary | legendary 只有 1%，别说没提醒你。 |
+| **Shiny** | yes / no / any | 1% 概率。闪光的才是最顶的。 |
+| **Hat** | none, crown, tophat, propeller, halo, wizard, beanie, tinyduck | 一只 duck 戴着 tinyduck 帽子。细品。 |
+| **Eyes** | `·` `✦` `×` `◉` `@` `°` | `◉` 能看穿你的灵魂。 |
+| **Peak stat** | DEBUGGING, PATIENCE, CHAOS, WISDOM, SNARK | SNARK 拉满才是正确答案。 |
+| **Name** | 随便起 | 用你家猫的名字也行，我们不评价。 |
 
-你可以锁定任意数量的属性，也可以全部留空。限制条件越少，搜索越快。
+任何问题都可以按 Enter 跳过，交给命运。条件越少，搜索越快。
 
 ## 工作原理
 
-Claude Code 通过以 userID 为种子的伪随机数生成器来决定伙伴属性。本工具的流程如下：
+Claude Code 的伙伴系统把你的 `userID` 喂进一个确定性伪随机数生成器，掷出物种、稀有度、帽子、眼睛、闪光和属性。同一个 ID，永远同一个伙伴。
 
-1. 询问你想要的属性 (species, rarity, shiny, hat, eyes, peak stat, name)。
-2. 随机生成用户 ID，逐一通过相同的推导逻辑进行检验。
-3. 找到匹配后停止搜索，将该 ID 写入 ~/.claude.json，并保存结果以便日后恢复。
+本工具做了三件事：
+1. 问你想要什么。
+2. 疯狂生成随机用户 ID，逐个用相同逻辑检验。
+3. 找到匹配的，写入 `~/.claude.json`，顺便存个备份给 `--restore` 用。
+
+这就像挖矿，只不过挖到的不是比特币，而是一只戴巫师帽的卡通幽灵。
 
 ## 平台支持
 
 | 平台 | 状态 | 备注 |
 |------|------|------|
-| macOS | 完整支持 | 包含 Keychain OAuth 令牌检测 |
+| macOS | 完整支持 | 自动通过 Keychain 检测 OAuth |
 | Linux | 完整支持 | 无需 Keychain |
 | Windows | 完整支持 | 无需 Keychain |
 
-## 保留你的伙伴 (OAuth 用户)
+## 保留你的伙伴（OAuth 用户）
 
-本工具会自动检测你使用的是 OAuth 还是 API key。
+工具会自动检测你用的是 OAuth 还是 API key。但 OAuth 用户有个小问题：Claude 重启时可能覆盖你的自定义 `userID`。三种解法，选一个：
 
-如果 Claude Code 在下次启动时覆盖了你的伙伴：
-
-1. **快速修复** -- 运行 `npx shiny-hunter --restore` 重新注入已保存的伙伴。
-2. **永久修复 (macOS)** -- 使用附带的 `claude-buddy` 包装脚本，它会从 Keychain 提取 OAuth 令牌并通过环境变量传递，从而阻止 Claude 覆盖 `userID`：
+1. **最省事** -- 被覆盖了就跑一下 `npx shiny-hunter --restore`，1 秒搞定。
+2. **一劳永逸 (macOS)** -- 用附带的 `claude-buddy` 启动脚本：
    ```bash
    cp claude-buddy ~/.local/bin/claude-buddy
    chmod 700 ~/.local/bin/claude-buddy
    ```
-   之后用 `claude-buddy` 代替 `claude` 启动即可。
-3. **手动方式** -- 在启动 Claude 之前，在 shell 环境中设置 `CLAUDE_CODE_OAUTH_TOKEN`。
+   以后用 `claude-buddy` 代替 `claude` 启动，它会帮你处理一切。
+3. **手动挡** -- 启动 Claude 之前设置环境变量 `CLAUDE_CODE_OAUTH_TOKEN`。
 
-## 搜索难度参考
+API key 用户：不用操心，你的伙伴永远在。去喝杯茶吧。
 
-| 锁定条件 | 大约尝试次数 | 预计耗时 |
-|----------|-------------|---------|
-| 仅选 species | ~18 | 瞬间完成 |
-| Species + rarity | ~45 (common) 到 ~1,800 (legendary) | 不到 1 秒 |
-| Species + rarity + hat | ~360 (common) 到 ~14,400 (legendary) | 数秒 |
-| Species + rarity + hat + eyes | ~2,160 到 ~86,400 | 数秒到数分钟 |
-| 以上全部 + shiny | ~216,000 到 ~8,640,000 | 数分钟到数小时 |
+## 要多久？
 
-以上为粗略预估，实际耗时取决于 CPU 性能和运气。
+| 你的要求 | 大约次数 | 体感时间 |
+|----------|---------|---------|
+| 只选物种 | ~18 | 眨个眼就完了 |
+| 物种 + legendary | ~1,800 | 还是很快 |
+| 物种 + legendary + wizard 帽 | ~14,400 | 几秒钟 |
+| 以上全部 + 指定眼睛 | ~86,400 | 去倒杯水 |
+| 以上全部 + 闪光 | ~8,640,000 | 出门散个步，回来差不多了 |
+
+取决于 CPU 速度和运气。进度条会陪着你。
 
 ## 安全性
 
-- **零依赖** -- 仅使用 Node.js 内置模块
-- **无网络请求** -- 一切在本地运行
-- **31 项自动化安全测试** -- 运行 `node security-test.mjs` 自行验证
-- 详见 [SECURITY.md](./SECURITY.md) 了解完整安全声明
+这个工具只写一个文件（`~/.claude.json`），可选读一个文件（macOS Keychain）。没了。没有网络，没有依赖，没有惊喜。
+
+- **零依赖** -- 只用 Node.js 内置模块。`node_modules` 永远是空的。
+- **无网络请求** -- 连 DNS 都不查。飞行模式友好。
+- **31 项安全测试** -- 跑一下 `node security-test.mjs` 眼见为实。
+- 完整分析见 [SECURITY.md](./SECURITY.md)。
 
 ## 环境要求
 
 - Node.js 18+
 - 已安装 Claude Code
+- 耐心（可选，但刷闪光 legendary 时强烈建议）
 
 ## 参考
 
@@ -107,4 +122,4 @@ Claude Code 通过以 userID 为种子的伪随机数生成器来决定伙伴属
 
 ## 许可证
 
-[MIT](./LICENSE)
+[MIT](./LICENSE) -- 想怎么用就怎么用。

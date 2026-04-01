@@ -7,9 +7,16 @@
 
 [中文说明](./README.zh.md)
 
-Find your perfect Claude Code buddy.
+Your Claude Code companion is decided by a hash of your user ID. You didn't get to choose. **Until now.**
 
-> Claude Code gives every user a randomly generated companion creature. The species, rarity, hat, eyes, and stats are all derived from a hash of your user ID. **shiny-hunter** brute-force searches for a user ID that produces the exact buddy you want, then injects it into `~/.claude.json`.
+```
+  ┌──────────────────────────────────┐
+  │       ✨  shiny-hunter  ✨        │
+  │   find your perfect Claude buddy  │
+  └──────────────────────────────────┘
+```
+
+Think of it like soft-resetting for a shiny starter -- except instead of mashing buttons for hours, your CPU does the mashing. Pick your dream species, rarity, hat, eyes, and stats, and let brute force do the rest.
 
 ## Quick Start
 
@@ -17,88 +24,96 @@ Find your perfect Claude Code buddy.
 npx shiny-hunter
 ```
 
+Answer 7 questions. Wait. Meet your new best friend. That's it.
+
 ```bash
-npx shiny-hunter --restore   # re-apply your saved buddy
-npx shiny-hunter --help
+npx shiny-hunter --restore   # buddy got overwritten? one command to bring it back
+npx shiny-hunter --help      # for the cautious types
 ```
 
-Or clone and run directly:
+Or clone if you want to read every line first (respect):
 
 ```bash
 git clone https://github.com/agentenatalie/shiny-hunter.git
 node shiny-hunter/hunt.mjs
 ```
 
-After the hunt completes, restart Claude Code and type `/buddy` to meet your companion.
+After the hunt, restart Claude Code and type `/buddy`.
 
-## What You Can Choose
+## The Menu
 
-| Attribute  | Options |
-|------------|---------|
-| **Species** (18) | duck, goose, blob, cat, dragon, octopus, owl, penguin, turtle, snail, ghost, axolotl, capybara, cactus, robot, rabbit, mushroom, chonk |
-| **Rarity** | common (60%), uncommon (25%), rare (10%), epic (4%), legendary (1%) |
-| **Shiny** | yes / no / any (1% chance per roll) |
-| **Hat** | none, crown, tophat, propeller, halo, wizard, beanie, tinyduck |
-| **Eyes** | `·` `✦` `×` `◉` `@` `°` |
-| **Peak stat** | DEBUGGING, PATIENCE, CHAOS, WISDOM, SNARK |
-| **Name** | free-text (matched against generated name candidates) |
+| Attribute | Options | Notes |
+|-----------|---------|-------|
+| **Species** | duck, goose, blob, cat, dragon, octopus, owl, penguin, turtle, snail, ghost, axolotl, capybara, cactus, robot, rabbit, mushroom, chonk | 18 creatures. Yes, chonk is a species. |
+| **Rarity** | common, uncommon, rare, epic, legendary | Legendary is 1%. You've been warned. |
+| **Shiny** | yes / no / any | 1% chance. The flex is real. |
+| **Hat** | none, crown, tophat, propeller, halo, wizard, beanie, tinyduck | A duck wearing a tinyduck hat. Think about it. |
+| **Eyes** | `·` `✦` `×` `◉` `@` `°` | `◉` sees into your soul. |
+| **Peak stat** | DEBUGGING, PATIENCE, CHAOS, WISDOM, SNARK | Max SNARK is the correct answer. |
+| **Name** | anything you want | Name it after your cat. We won't judge. |
 
-You can lock in as many or as few attributes as you want. The fewer constraints, the faster the hunt.
+Skip any question to leave it up to fate. Fewer filters = faster hunt.
 
 ## How It Works
 
-Claude Code derives your buddy from a seeded PRNG keyed on `userID`. This tool:
+Claude Code's buddy system feeds your `userID` through a seeded PRNG to roll species, rarity, hat, eyes, shiny, and stats. The roll is deterministic -- same ID, same buddy, every time.
 
-1. Asks what you want (species, rarity, shiny, hat, eyes, peak stat, name).
-2. Generates random user IDs and rolls each one through the same derivation logic.
-3. Stops when it finds a match, writes the ID to `~/.claude.json`, and saves the result for later restore.
+This tool:
+1. Asks what you want.
+2. Generates millions of random user IDs, rolling each one through the same logic.
+3. Finds a match, writes it to `~/.claude.json`, saves a backup for `--restore`.
+
+It's like mining Bitcoin, except you get a cartoon ghost in a wizard hat instead of money.
 
 ## Platform Support
 
 | Platform | Status | Notes |
 |----------|--------|-------|
-| macOS    | Full   | Includes Keychain OAuth token detection |
-| Linux    | Full   | No Keychain needed |
-| Windows  | Full   | No Keychain needed |
+| macOS | Full | OAuth auto-detected via Keychain |
+| Linux | Full | Works great, no Keychain needed |
+| Windows | Full | Works great, no Keychain needed |
 
 ## Keeping Your Buddy (OAuth Users)
 
-The tool auto-detects whether you use OAuth or an API key.
+The tool auto-detects OAuth vs API key. But OAuth users have one problem: Claude may overwrite your custom `userID` on next launch. Three fixes, pick one:
 
-If Claude Code overwrites your buddy on next launch:
-
-1. **Quick fix** -- run `npx shiny-hunter --restore` to re-inject your saved buddy.
-2. **Permanent fix (macOS)** -- use the included `claude-buddy` wrapper script, which extracts your OAuth token from Keychain and passes it via environment variable so Claude never overwrites `userID`:
+1. **The easy way** -- just run `npx shiny-hunter --restore` whenever it happens. Takes 1 second.
+2. **The permanent way (macOS)** -- use the included `claude-buddy` wrapper:
    ```bash
    cp claude-buddy ~/.local/bin/claude-buddy
    chmod 700 ~/.local/bin/claude-buddy
    ```
-   Then launch with `claude-buddy` instead of `claude`.
-3. **Manual** -- set `CLAUDE_CODE_OAUTH_TOKEN` in your shell environment before launching Claude.
+   Launch with `claude-buddy` instead of `claude`. It handles everything.
+3. **The manual way** -- set `CLAUDE_CODE_OAUTH_TOKEN` in your shell before launching Claude.
 
-## Difficulty Reference
+API key users: you're fine. Your buddy stays forever. Go relax.
 
-| Filters locked | Approx. attempts | Time estimate |
-|----------------|-------------------|---------------|
-| Species only | ~18 | instant |
-| Species + rarity | ~45 (common) to ~1,800 (legendary) | under 1s |
-| Species + rarity + hat | ~360 (common) to ~14,400 (legendary) | seconds |
-| Species + rarity + hat + eyes | ~2,160 to ~86,400 | seconds to minutes |
-| All of the above + shiny | ~216,000 to ~8,640,000 | minutes to hours |
+## How Long Will It Take?
 
-Numbers are rough expectations. Actual time depends on your CPU and luck.
+| What you asked for | Attempts | Wall time |
+|--------------------|----------|-----------|
+| Just a species | ~18 | Blink and you'll miss it |
+| Species + legendary | ~1,800 | Still fast |
+| Species + legendary + wizard hat | ~14,400 | A few seconds |
+| All that + specific eyes | ~86,400 | Grab some water |
+| All that + SHINY | ~8,640,000 | Go touch grass, come back later |
+
+Your CPU speed and RNG luck will vary. The progress bar keeps you company.
 
 ## Security
 
-- **Zero dependencies** -- only Node.js built-ins
-- **No network calls** -- everything runs locally
-- **31 automated security tests** -- run `node security-test.mjs` to verify
-- See [SECURITY.md](./SECURITY.md) for the full security statement
+This tool writes to one file (`~/.claude.json`) and reads from one file (macOS Keychain, optionally). That's it. No network. No dependencies. No surprises.
+
+- **Zero dependencies** -- only Node.js built-ins. `node_modules` stays empty.
+- **No network calls** -- not even a DNS lookup. Airplane mode friendly.
+- **31 security tests** -- run `node security-test.mjs` and see for yourself.
+- Full analysis in [SECURITY.md](./SECURITY.md).
 
 ## Requirements
 
 - Node.js 18+
 - Claude Code installed
+- Patience (optional, but recommended for shiny legendary hunts)
 
 ## References
 
@@ -107,4 +122,4 @@ Numbers are rough expectations. Actual time depends on your CPU and luck.
 
 ## License
 
-[MIT](./LICENSE)
+[MIT](./LICENSE) -- do whatever you want with it.
