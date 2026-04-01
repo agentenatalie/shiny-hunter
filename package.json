@@ -1,14 +1,41 @@
 {
   "name": "shiny-hunter",
-  "version": "1.0.0",
-  "description": "Find your perfect Claude Code buddy",
+  "version": "2.0.0",
+  "description": "Find your perfect Claude Code buddy — hunt for the exact species, rarity, and stats you want",
   "type": "module",
   "bin": {
     "shiny-hunter": "./hunt.mjs"
   },
+  "scripts": {
+    "test": "node security-test.mjs",
+    "start": "node hunt.mjs"
+  },
+  "files": [
+    "hunt.mjs",
+    "claude-buddy",
+    "README.md",
+    "README.zh.md",
+    "SECURITY.md",
+    "LICENSE"
+  ],
   "engines": {
     "node": ">=18"
   },
-  "keywords": ["claude", "claude-code", "buddy"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agentenatalie/shiny-hunter.git"
+  },
+  "bugs": {
+    "url": "https://github.com/agentenatalie/shiny-hunter/issues"
+  },
+  "homepage": "https://github.com/agentenatalie/shiny-hunter#readme",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "buddy",
+    "companion",
+    "cli"
+  ],
+  "author": "agentenatalie",
   "license": "MIT"
 }
