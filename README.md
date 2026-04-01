@@ -100,6 +100,11 @@ Numbers are rough expectations. Actual time depends on your CPU and luck.
 - Node.js 18+
 - Claude Code installed
 
+## References
+
+- [Claude Code Buddy 机制解析](https://linux.do/t/topic/1871870)
+- [Shiny Hunter 讨论帖](https://linux.do/t/topic/1873901/13)
+
 ## License
 
 [MIT](./LICENSE)

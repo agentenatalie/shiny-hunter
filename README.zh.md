@@ -100,6 +100,11 @@ Claude Code 通过以 userID 为种子的伪随机数生成器来决定伙伴属
 - Node.js 18+
 - 已安装 Claude Code
 
+## 参考
+
+- [Claude Code Buddy 机制解析](https://linux.do/t/topic/1871870)
+- [Shiny Hunter 讨论帖](https://linux.do/t/topic/1873901/13)
+
 ## 许可证
 
 [MIT](./LICENSE)
