@@ -3,7 +3,8 @@ import { randomBytes } from 'node:crypto'
 import { createInterface as readline } from 'node:readline'
 import { execSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
+import { homedir, cpus } from 'node:os'
+import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads'
 
 // ─── constants & helpers ─────────────────────────────────────────────────────
 
@@ -114,6 +115,37 @@ function matches(bones, filters) {
   if (filters.peakStat && bones.peakStat !== filters.peakStat) return false
   if (filters.shiny != null && bones.shiny !== filters.shiny)  return false
   return true
+}
+
+// ─── fast parallel search ────────────────────────────────────────────────────
+
+const HEX = '0123456789abcdef'
+
+function fastHexId(rng) {
+  let id = ''
+  for (let j = 0; j < 64; j++) {
+    id += HEX[(rng() * 16) | 0]
+  }
+  return id
+}
+
+function workerSearch(filters, seed) {
+  const idRng = mulberry32(seed)
+  for (let i = 0; ; i++) {
+    const userId = fastHexId(idRng)
+    const { bones, inspirationSeed } = roll(userId)
+    if (matches(bones, filters)) {
+      parentPort.postMessage({ type: 'found', userId, bones, inspirationSeed, attempts: i + 1 })
+      return
+    }
+    if (i % 50000 === 0) {
+      parentPort.postMessage({ type: 'progress', attempts: i })
+    }
+  }
+}
+
+if (!isMainThread) {
+  workerSearch(workerData.filters, workerData.seed)
 }
 
 // ─── visual previews ─────────────────────────────────────────────────────────
@@ -519,38 +551,67 @@ async function main() {
 
   // estimate & hunt
   const difficulty = estimateAttempts(filters)
-  console.log(`\n  Hunting... ${difficulty}`)
+  const numWorkers = Math.max(1, cpus().length)
+  console.log(`\n  Hunting with ${numWorkers} threads... ${difficulty}`)
 
-  const limit = 50_000_000
-  let found = null
-  const startMs = Date.now()
-  let lastProgressMs = startMs
+  const huntStartMs = Date.now()
+  const found = await new Promise((resolve) => {
+    const startMs = huntStartMs
+    const timeLimit = 5 * 60 * 1000 // 5 minutes
+    const workers = []
+    let totalAttempts = 0
+    let done = false
+    let lastProgressMs = startMs
 
-  for (let i = 0; i < limit; i++) {
-    const now = Date.now()
-    if (now - lastProgressMs >= 2000) {
-      const elapsedSec = ((now - startMs) / 1000).toFixed(1)
-      const rate = Math.round(i / ((now - startMs) / 1000))
-      process.stdout.write(`\r  ${i.toLocaleString()} attempts | ${rate.toLocaleString()}/sec | ${elapsedSec}s elapsed`)
-      lastProgressMs = now
+    function cleanup() {
+      if (done) return
+      done = true
+      for (const w of workers) w.terminate()
     }
-    const userId = randomBytes(32).toString('hex')
-    const { bones, inspirationSeed } = roll(userId)
-    if (!matches(bones, filters)) continue
-    found = { userId, bones, inspirationSeed, attempts: i + 1 }
-    break
-  }
 
-  process.stdout.write('\r' + ' '.repeat(70) + '\r')
+    const timer = setTimeout(() => {
+      cleanup()
+      resolve(null)
+    }, timeLimit)
+
+    const progressInterval = setInterval(() => {
+      const now = Date.now()
+      const elapsedSec = ((now - startMs) / 1000).toFixed(1)
+      const rate = Math.round(totalAttempts / ((now - startMs) / 1000))
+      process.stdout.write(`\r  ${totalAttempts.toLocaleString()} attempts | ${rate.toLocaleString()}/sec | ${elapsedSec}s | ${numWorkers} threads`)
+    }, 500)
+
+    for (let i = 0; i < numWorkers; i++) {
+      const seed = randomBytes(4).readUInt32LE()
+      const w = new Worker(new URL(import.meta.url), {
+        workerData: { filters, seed }
+      })
+      w.on('message', (msg) => {
+        if (msg.type === 'progress') {
+          totalAttempts += 50000
+        } else if (msg.type === 'found' && !done) {
+          clearTimeout(timer)
+          clearInterval(progressInterval)
+          cleanup()
+          resolve({ ...msg, totalAttempts })
+        }
+      })
+      w.on('error', () => {})
+      w.on('exit', () => {})
+      workers.push(w)
+    }
+  })
+
+  process.stdout.write('\r' + ' '.repeat(80) + '\r')
 
   if (!found) {
-    console.error(`\nNo match in ${limit.toLocaleString()} attempts. Try fewer filters.`)
+    console.error(`\n  No match found in 5 minutes. Try fewer filters.`)
     process.exit(1)
   }
 
-  const elapsed = ((Date.now() - startMs) / 1000).toFixed(1)
+  const elapsed = ((Date.now() - huntStartMs) / 1000).toFixed(1)
   const nameLabel = buddyName ? `  Name: ${buddyName}\n` : ''
-  console.log(`\n  Found after ${found.attempts.toLocaleString()} attempts (${elapsed}s):`)
+  console.log(`\n  Found after ~${found.totalAttempts.toLocaleString()} attempts (${elapsed}s):`)
   console.log(nameLabel + display(found.bones))
 
   // confirm
@@ -567,4 +628,6 @@ async function main() {
   printPostInject()
 }
 
-main().catch(e => { console.error(e.message); process.exit(1) })
+if (isMainThread) {
+  main().catch(e => { console.error(e.message); process.exit(1) })
+}

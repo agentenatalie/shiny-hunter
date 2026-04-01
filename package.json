@@ -1,6 +1,6 @@
 {
   "name": "shiny-hunter",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Find your perfect Claude Code buddy — hunt for the exact species, rarity, and stats you want",
   "type": "module",
   "bin": {
