@@ -1,73 +1,96 @@
-# shiny-hunter ✨
+# shiny-hunter
 
-帮你找到心仪的 Claude Code 宠物，一行命令搞定。
+[![npm version](https://img.shields.io/npm/v/shiny-hunter)](https://www.npmjs.com/package/shiny-hunter)
+[![node](https://img.shields.io/node/v/shiny-hunter)](https://nodejs.org)
+[![license](https://img.shields.io/github/license/agentenatalie/shiny-hunter)](./LICENSE)
+[![zero dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)]()
 
-```
-╔════════════════════════════════╗
-║     ✨  shiny-hunter  ✨       ║
-║  find your perfect Claude buddy ║
-╚════════════════════════════════╝
-```
+[English](./README.md)
 
-## 使用方法
+找到你心仪的 Claude Code 伙伴。
 
-克隆后运行：
+> Claude Code 会根据用户 ID 的哈希值，为每位用户随机生成一个伙伴生物。物种、稀有度、帽子、眼睛和属性值都由此哈希决定。**shiny-hunter** 通过暴力搜索，找到一个能生成你理想伙伴的用户 ID，并将其写入 `~/.claude.json`。
 
-```bash
-git clone https://github.com/agentenatalie/shiny-hunter
+## 快速开始
+
+npx shiny-hunter
+npx shiny-hunter --restore   # 重新应用已保存的伙伴
+npx shiny-hunter --help
+
+或者克隆后直接运行：
+
+git clone https://github.com/agentenatalie/shiny-hunter.git
 node shiny-hunter/hunt.mjs
-```
 
-## 它会问你什么
+搜索完成后，重启 Claude Code 并输入 /buddy 即可见到你的伙伴。
 
-七个问题，每个都可以按 Enter 跳过（随机）：
+## 可选属性
 
-1. **物种** — duck / rabbit / dragon / axolotl 等 18 种
-2. **稀有度** — common / uncommon / rare / epic / legendary
-3. **闪光** — 是 / 否 / 无所谓
-4. **帽子** — none / crown / tophat / wizard 等
-5. **眼睛** — · ✦ × ◉ @ °
-6. **最强天赋** — DEBUGGING / PATIENCE / CHAOS / WISDOM / SNARK
-7. **名字** — 给你的宠物起个名字（可跳过）
+| 属性 | 选项 |
+|------|------|
+| **Species** (18 种) | duck, goose, blob, cat, dragon, octopus, owl, penguin, turtle, snail, ghost, axolotl, capybara, cactus, robot, rabbit, mushroom, chonk |
+| **Rarity** | common (60%), uncommon (25%), rare (10%), epic (4%), legendary (1%) |
+| **Shiny** | yes / no / any (每次投掷 1% 概率) |
+| **Hat** | none, crown, tophat, propeller, halo, wizard, beanie, tinyduck |
+| **Eyes** | · ✦ × ◉ @ ° |
+| **Peak stat** | DEBUGGING, PATIENCE, CHAOS, WISDOM, SNARK |
+| **Name** | 自由输入 (与生成的候选名称进行匹配) |
 
-回答完后开始搜索，找到后预览，确认即写入。
+你可以锁定任意数量的属性，也可以全部留空。限制条件越少，搜索越快。
 
-## 原理
+## 工作原理
 
-Claude Code 的宠物系统根据 `~/.claude.json` 里的 `userID` 字段哈希出宠物属性。本工具暴力搜索一个能哈希出你想要属性的 `userID`，然后写入配置文件。
+Claude Code 通过以 userID 为种子的伪随机数生成器来决定伙伴属性。本工具的流程如下：
 
-重启 Claude，输入 `/buddy` 即可见到新宠物。
+1. 询问你想要的属性 (species, rarity, shiny, hat, eyes, peak stat, name)。
+2. 随机生成用户 ID，逐一通过相同的推导逻辑进行检验。
+3. 找到匹配后停止搜索，将该 ID 写入 ~/.claude.json，并保存结果以便日后恢复。
 
-**macOS 注意：** 用 OAuth 登录时，Claude 会写入 `accountUuid` 覆盖 `userID`。工具会自动处理，但建议用附带的 `claude-buddy` 脚本启动 Claude，避免每次重置。
+## 平台支持
 
-## claude-buddy 启动脚本（macOS）
+| 平台 | 状态 | 备注 |
+|------|------|------|
+| macOS | 完整支持 | 包含 Keychain OAuth 令牌检测 |
+| Linux | 完整支持 | 无需 Keychain |
+| Windows | 完整支持 | 无需 Keychain |
 
-保持 `accountUuid` 永远不回来：
+## 保留你的伙伴 (OAuth 用户)
 
-```bash
-cp claude-buddy ~/.local/bin/claude-buddy
-chmod 700 ~/.local/bin/claude-buddy
-```
+本工具会自动检测你使用的是 OAuth 还是 API key。
 
-之后用 `claude-buddy` 代替 `claude` 启动即可。
+如果 Claude Code 在下次启动时覆盖了你的伙伴：
+
+1. 快速修复 -- 运行 npx shiny-hunter --restore 重新注入已保存的伙伴。
+2. 永久修复 (macOS) -- 使用附带的 claude-buddy 包装脚本，它会从 Keychain 提取 OAuth 令牌并通过环境变量传递，从而阻止 Claude 覆盖 userID：
+   cp claude-buddy ~/.local/bin/claude-buddy
+   chmod 700 ~/.local/bin/claude-buddy
+   之后用 claude-buddy 代替 claude 启动即可。
+3. 手动方式 -- 在启动 Claude 之前，在 shell 环境中设置 CLAUDE_CODE_OAUTH_TOKEN。
 
 ## 搜索难度参考
 
-| 条件组合 | 大概要试多少次 |
-|---------|-------------|
-| 只选物种 | ~18 次 |
-| 物种 + 稀有度(legendary) | ~1,800 次 |
-| 物种 + legendary + 闪光 | ~180,000 次 |
-| 物种 + legendary + 闪光 + 指定帽子 + 指定眼睛 | ~800 万次，需要几分钟 |
+| 锁定条件 | 大约尝试次数 | 预计耗时 |
+|----------|-------------|---------|
+| 仅选 species | ~18 | 瞬间完成 |
+| Species + rarity | ~45 (common) 到 ~1,800 (legendary) | 不到 1 秒 |
+| Species + rarity + hat | ~360 (common) 到 ~14,400 (legendary) | 数秒 |
+| Species + rarity + hat + eyes | ~2,160 到 ~86,400 | 数秒到数分钟 |
+| 以上全部 + shiny | ~216,000 到 ~8,640,000 | 数分钟到数小时 |
+
+以上为粗略预估，实际耗时取决于 CPU 性能和运气。
 
 ## 安全性
 
-运行 `node security-test.mjs` 可自行验证，28 项测试全部通过。
-
-详见 [SECURITY.md](./SECURITY.md)。
+- 零依赖 -- 仅使用 Node.js 内置模块
+- 无网络请求 -- 一切在本地运行
+- 31 项自动化安全测试 -- 运行 node security-test.mjs 自行验证
+- 详见 SECURITY.md 了解完整安全声明
 
 ## 环境要求
 
 - Node.js 18+
-- Claude Code
-- macOS（OAuth 绕过方案专用；Linux 用户通常不需要）
+- 已安装 Claude Code
+
+## 许可证
+
+MIT
