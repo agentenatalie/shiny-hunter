@@ -1,0 +1,28 @@
+#!/bin/bash
+# Starts Claude with OAuth token to prevent accountUuid being written back,
+# so the buddy system uses the userID set by shiny-hunter instead.
+
+TOKEN=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null | python3 -c "
+import sys, json
+d = json.loads(sys.stdin.read().strip())
+print(d['claudeAiOauth']['accessToken'])
+" 2>/dev/null)
+
+if [ -z "$TOKEN" ]; then
+  echo "Could not read token from Keychain, starting claude normally..."
+  exec claude "$@"
+fi
+
+# Remove accountUuid if it crept back in (keeps shiny-hunter's userID in effect)
+python3 -c "
+import json, os
+path = os.path.expanduser('~/.claude.json')
+with open(path) as f:
+    d = json.load(f)
+if 'accountUuid' in d.get('oauthAccount', {}):
+    del d['oauthAccount']['accountUuid']
+    with open(path, 'w') as f:
+        json.dump(d, f, indent=2)
+" 2>/dev/null
+
+exec env CLAUDE_CODE_OAUTH_TOKEN="$TOKEN" claude "$@"

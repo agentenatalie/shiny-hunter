@@ -1,0 +1,14 @@
+{
+  "name": "shiny-hunter",
+  "version": "1.0.0",
+  "description": "Find your perfect Claude Code buddy",
+  "type": "module",
+  "bin": {
+    "shiny-hunter": "./hunt.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": ["claude", "claude-code", "buddy"],
+  "license": "MIT"
+}
