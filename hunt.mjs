@@ -266,14 +266,6 @@ function estimateAttempts(f) {
 
 // ─── main ─────────────────────────────────────────────────────────────────────
 
-console.log(`
-╔════════════════════════════════╗
-║     ✨  shiny-hunter  ✨       ║
-║  find your perfect Claude buddy ║
-╚════════════════════════════════╝
-Answer each question or press Enter to skip (any).
-`)
-
 async function main() {
   const args = process.argv.slice(2)
 
@@ -295,6 +287,15 @@ async function main() {
     printPostInject()
     process.exit(0)
   }
+
+  console.log(`
+  ┌──────────────────────────────────┐
+  │       ✨  shiny-hunter  ✨        │
+  │   find your perfect Claude buddy  │
+  └──────────────────────────────────┘
+
+  Answer each question or press Enter to skip.
+`)
 
   const filters = {}
 
@@ -365,14 +366,25 @@ async function main() {
   const limit = 50_000_000
   let found = null
   const startMs = Date.now()
+  let lastProgressMs = startMs
 
   for (let i = 0; i < limit; i++) {
+    const now = Date.now()
+    if (now - lastProgressMs >= 2000) {
+      const elapsedSec = ((now - startMs) / 1000).toFixed(1)
+      const rate = Math.round(i / ((now - startMs) / 1000))
+      process.stdout.write(`\r  ${i.toLocaleString()} attempts | ${rate.toLocaleString()}/sec | ${elapsedSec}s elapsed`)
+      lastProgressMs = now
+    }
     const userId = randomBytes(32).toString('hex')
     const { bones, inspirationSeed } = roll(userId)
     if (!matches(bones, filters)) continue
     found = { userId, bones, inspirationSeed, attempts: i + 1 }
     break
   }
+
+  // Clear the progress line
+  process.stdout.write('\r' + ' '.repeat(70) + '\r')
 
   if (!found) {
     console.error(`\nNo match found in ${limit.toLocaleString()} attempts. Try fewer filters.`)
