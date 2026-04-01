@@ -1,5 +1,7 @@
 # shiny-hunter ✨
 
+[中文说明](./README.zh.md)
+
 Find your perfect Claude Code buddy, one roll at a time.
 
 ```
