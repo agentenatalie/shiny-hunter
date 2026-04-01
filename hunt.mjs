@@ -10,13 +10,19 @@ import { homedir } from 'node:os'
 const RESULT_PATH = homedir() + '/.shiny-hunter-result.json'
 
 function showHelp() {
-  console.log(`Usage: hunt.mjs [options]
+  console.log(`Usage: shiny-hunter [options]
 
 Options:
   --help, -h    Show this help message and exit
   --restore     Restore the last saved buddy result and inject it
 
 When run without flags, starts an interactive hunt session.
+
+Controls:
+  ↑/↓           Navigate options
+  Enter          Select highlighted option
+  Tab            Skip (any / surprise me)
+  Type a number  Jump to that option
 `)
   process.exit(0)
 }
@@ -110,16 +116,208 @@ function matches(bones, filters) {
   return true
 }
 
-// ─── interactive prompts ──────────────────────────────────────────────────────
+// ─── visual previews ─────────────────────────────────────────────────────────
 
-const rl = readline({ input: process.stdin, output: process.stdout })
-const ask = (q) => new Promise((resolve) => rl.question(q, resolve))
-
-function menu(label, items, allowAny = true) {
-  const lines = items.map((v, i) => `  ${String(i + 1).padStart(2)}. ${v}`).join('\n')
-  const anyHint = allowAny ? '   0. any (surprise me)\n' : ''
-  return `${label}\n${lines}\n${anyHint}`
+const SPECIES_PREVIEW = {
+  duck:      '🦆', goose:    '🪿', blob:     '🫠', cat:       '🐱',
+  dragon:    '🐉', octopus:  '🐙', owl:      '🦉', penguin:   '🐧',
+  turtle:    '🐢', snail:    '🐌', ghost:    '👻', axolotl:   '🦎',
+  capybara:  '🦫', cactus:   '🌵', robot:    '🤖', rabbit:    '🐰',
+  mushroom:  '🍄', chonk:    '🐾',
 }
+
+const RARITY_PREVIEW = {
+  common:    '★        60%',
+  uncommon:  '★★       25%',
+  rare:      '★★★      10%',
+  epic:      '★★★★      4%',
+  legendary: '★★★★★     1%',
+}
+
+const HAT_PREVIEW = {
+  none:      '  (bare head)',
+  crown:     '👑 crown',
+  tophat:    '🎩 top hat',
+  propeller: '🧢 propeller cap',
+  halo:      '😇 halo',
+  wizard:    '🧙 wizard hat',
+  beanie:    '🧶 beanie',
+  tinyduck:  '🦆 tiny duck on head',
+}
+
+const STAT_PREVIEW = {
+  DEBUGGING: '🐛 bug whisperer',
+  PATIENCE:  '🧘 zen master',
+  CHAOS:     '🔥 chaos gremlin',
+  WISDOM:    '🧠 big brain',
+  SNARK:     '😏 sass machine',
+}
+
+// ─── interactive selector ────────────────────────────────────────────────────
+
+function select(title, items, previewMap) {
+  return new Promise((resolve) => {
+    const skipItem = '✦ any (surprise me)'
+    const allItems = [skipItem, ...items]
+    let cursor = 1  // start on first real item, not "any"
+    const total = allItems.length
+
+    function getPreview(item) {
+      if (item === skipItem) return ''
+      if (previewMap && previewMap[item]) return `  ${previewMap[item]}`
+      return ''
+    }
+
+    function render() {
+      // Move cursor up to overwrite previous render
+      if (rendered) process.stdout.write(`\x1b[${total + 2}A`)
+      process.stdout.write(`\x1b[2K  ${title}\n`)
+      for (let i = 0; i < total; i++) {
+        const marker = i === cursor ? '\x1b[36m❯\x1b[0m' : ' '
+        const label = allItems[i]
+        const preview = getPreview(label)
+        const highlight = i === cursor ? `\x1b[1m${label}${preview}\x1b[0m` : `${label}${preview}`
+        process.stdout.write(`\x1b[2K  ${marker} ${highlight}\n`)
+      }
+      process.stdout.write(`\x1b[2K  \x1b[2m↑↓ navigate · enter select · tab skip\x1b[0m\n`)
+      rendered = true
+    }
+
+    let rendered = false
+    process.stdin.setRawMode(true)
+    process.stdin.resume()
+    render()
+
+    function onKey(key) {
+      // Arrow up
+      if (key[0] === 0x1b && key[1] === 0x5b && key[2] === 0x41) {
+        cursor = (cursor - 1 + total) % total
+        render()
+        return
+      }
+      // Arrow down
+      if (key[0] === 0x1b && key[1] === 0x5b && key[2] === 0x42) {
+        cursor = (cursor + 1) % total
+        render()
+        return
+      }
+      // Enter
+      if (key[0] === 0x0d) {
+        cleanup()
+        resolve(cursor === 0 ? null : allItems[cursor])
+        return
+      }
+      // Tab = skip
+      if (key[0] === 0x09) {
+        cleanup()
+        resolve(null)
+        return
+      }
+      // Ctrl-C
+      if (key[0] === 0x03) {
+        cleanup()
+        process.exit(0)
+      }
+      // Number keys 0-9
+      if (key[0] >= 0x30 && key[0] <= 0x39) {
+        const n = key[0] - 0x30
+        if (n === 0) {
+          cleanup()
+          resolve(null)
+          return
+        }
+        if (n >= 1 && n <= items.length) {
+          cursor = n  // offset by 1 because of skip item
+          render()
+          // Auto-confirm on number press
+          cleanup()
+          resolve(allItems[cursor])
+          return
+        }
+      }
+      // Letters: jump to first match
+      const ch = String.fromCharCode(key[0]).toLowerCase()
+      if (ch >= 'a' && ch <= 'z') {
+        const idx = allItems.findIndex((v, i) => i > 0 && v[0]?.toLowerCase() === ch)
+        if (idx !== -1) {
+          cursor = idx
+          render()
+        }
+      }
+    }
+
+    function cleanup() {
+      process.stdin.removeListener('data', onKey)
+      process.stdin.setRawMode(false)
+      process.stdin.pause()
+    }
+
+    process.stdin.on('data', onKey)
+  })
+}
+
+function selectYesNo(title) {
+  return new Promise((resolve) => {
+    const items = ['✨ yes (shiny!)', '  no', '✦ any (surprise me)']
+    let cursor = 2  // default to "any"
+    const total = items.length
+
+    function render() {
+      if (rendered) process.stdout.write(`\x1b[${total + 2}A`)
+      process.stdout.write(`\x1b[2K  ${title}\n`)
+      for (let i = 0; i < total; i++) {
+        const marker = i === cursor ? '\x1b[36m❯\x1b[0m' : ' '
+        const highlight = i === cursor ? `\x1b[1m${items[i]}\x1b[0m` : items[i]
+        process.stdout.write(`\x1b[2K  ${marker} ${highlight}\n`)
+      }
+      process.stdout.write(`\x1b[2K  \x1b[2m↑↓ navigate · enter select · tab skip\x1b[0m\n`)
+      rendered = true
+    }
+
+    let rendered = false
+    process.stdin.setRawMode(true)
+    process.stdin.resume()
+    render()
+
+    function onKey(key) {
+      if (key[0] === 0x1b && key[1] === 0x5b && key[2] === 0x41) {
+        cursor = (cursor - 1 + total) % total; render(); return
+      }
+      if (key[0] === 0x1b && key[1] === 0x5b && key[2] === 0x42) {
+        cursor = (cursor + 1) % total; render(); return
+      }
+      if (key[0] === 0x0d) {
+        cleanup(); resolve(cursor === 0 ? true : cursor === 1 ? false : null); return
+      }
+      if (key[0] === 0x09) { cleanup(); resolve(null); return }
+      if (key[0] === 0x03) { cleanup(); process.exit(0) }
+      // y/n shortcuts
+      const ch = String.fromCharCode(key[0]).toLowerCase()
+      if (ch === 'y') { cleanup(); resolve(true); return }
+      if (ch === 'n') { cleanup(); resolve(false); return }
+    }
+
+    function cleanup() {
+      process.stdin.removeListener('data', onKey)
+      process.stdin.setRawMode(false)
+      process.stdin.pause()
+    }
+
+    process.stdin.on('data', onKey)
+  })
+}
+
+function askText(question) {
+  const rl = readline({ input: process.stdin, output: process.stdout })
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      rl.close()
+      resolve(answer.trim())
+    })
+  })
+}
+
+// ─── input validation (for security tests) ──────────────────────────────────
 
 function parseChoice(input, items) {
   const s = input.trim().toLowerCase()
@@ -134,14 +332,12 @@ function parseChoice(input, items) {
 // ─── inject ───────────────────────────────────────────────────────────────────
 
 function detectAuth() {
-  // Check if OAuth account exists in ~/.claude.json
   let hasOAuth = false
   try {
     const config = JSON.parse(readFileSync(homedir() + '/.claude.json', 'utf8'))
     hasOAuth = !!config.oauthAccount?.accountUuid
   } catch { /* no config or parse error */ }
 
-  // On macOS, try Keychain for OAuth token
   if (process.platform === 'darwin') {
     try {
       const raw = execSync(
@@ -154,10 +350,7 @@ function detectAuth() {
     } catch { /* no keychain entry */ }
   }
 
-  // Fall back to JSON-based OAuth detection (all platforms)
   if (hasOAuth) return { type: 'oauth', hasOAuth: true, token: null }
-
-  // API key user
   return { type: 'api', hasOAuth: false, token: null }
 }
 
@@ -203,7 +396,6 @@ function display(bones) {
 function printPostInject() {
   const auth = detectAuth()
   if (auth.type === 'oauth' && auth.token) {
-    // macOS with Keychain token
     console.log(`
 Applied! Now start Claude using:
 
@@ -215,7 +407,6 @@ Then type /buddy to meet your new companion.
 Tip: re-run with --restore to reapply this buddy later.
 `)
   } else if (auth.type === 'oauth') {
-    // Linux/Windows — OAuth without Keychain token
     console.log(`
 Applied! Warning: logging in via OAuth will overwrite the buddy userID.
 
@@ -227,7 +418,6 @@ Then type /buddy to meet your new companion.
 Tip: re-run with --restore to reapply this buddy later.
 `)
   } else {
-    // API key user
     console.log(`
 Applied! Restart Claude and type /buddy.
 
@@ -266,12 +456,10 @@ async function main() {
   const args = process.argv.slice(2)
 
   if (args.includes('--help') || args.includes('-h')) {
-    rl.close()
     showHelp()
   }
 
   if (args.includes('--restore')) {
-    rl.close()
     const saved = loadResult()
     if (!saved) {
       console.error('No saved result found. Run a hunt first.')
@@ -289,75 +477,49 @@ async function main() {
   │       ✨  shiny-hunter  ✨        │
   │   find your perfect Claude buddy  │
   └──────────────────────────────────┘
-
-  Answer each question or press Enter to skip.
 `)
 
   const filters = {}
 
   // species
-  while (true) {
-    const input = await ask(menu('Which species?', SPECIES))
-    const v = parseChoice(input, SPECIES)
-    if (v === undefined) { console.log(`  Invalid choice, try again.`); continue }
-    filters.species = v
-    break
-  }
+  const species = await select('Which species?', SPECIES, SPECIES_PREVIEW)
+  if (species) filters.species = species
+  console.log(`  → ${species ?? 'any'}\n`)
 
   // rarity
-  while (true) {
-    const input = await ask(menu('\nRarity?', RARITIES))
-    const v = parseChoice(input, RARITIES)
-    if (v === undefined) { console.log(`  Invalid choice, try again.`); continue }
-    filters.rarity = v
-    break
-  }
+  const rarity = await select('Rarity?', RARITIES, RARITY_PREVIEW)
+  if (rarity) filters.rarity = rarity
+  console.log(`  → ${rarity ?? 'any'}\n`)
 
   // shiny
-  while (true) {
-    const input = (await ask('\nShiny? [y = yes / n = no / Enter = any]\n> ')).trim().toLowerCase()
-    if (input === 'y' || input === 'yes') { filters.shiny = true; break }
-    if (input === 'n' || input === 'no')  { filters.shiny = false; break }
-    if (input === '' || input === 'any')  { break }
-    console.log('  Just y, n, or Enter.')
-  }
+  const shiny = await selectYesNo('Shiny?')
+  if (shiny != null) filters.shiny = shiny
+  console.log(`  → ${shiny === true ? 'yes ✨' : shiny === false ? 'no' : 'any'}\n`)
 
   // hat
-  while (true) {
-    const input = await ask(menu('\nHat?', HATS))
-    const v = parseChoice(input, HATS)
-    if (v === undefined) { console.log(`  Invalid choice, try again.`); continue }
-    filters.hat = v
-    break
-  }
+  const hat = await select('Hat?', HATS, HAT_PREVIEW)
+  if (hat) filters.hat = hat
+  console.log(`  → ${hat ?? 'any'}\n`)
 
   // eye
-  const eyeDisplay = EYES.map((e, i) => `${i + 1}. ${e}`).join('  ')
-  while (true) {
-    const input = (await ask(`\nEye style?\n  ${eyeDisplay}  0. any\n> `)).trim()
-    const v = parseChoice(input, EYES)
-    if (v === undefined) { console.log(`  Invalid choice, try again.`); continue }
-    filters.eye = v
-    break
-  }
+  const eyePreview = Object.fromEntries(EYES.map(e => [e, `  looks like this: ( ${e} ‿ ${e} )`]))
+  const eye = await select('Eye style?', EYES, eyePreview)
+  if (eye) filters.eye = eye
+  console.log(`  → ${eye ?? 'any'}\n`)
 
   // peak stat
-  const statDisplay = STAT_NAMES.map((s, i) => `${i + 1}. ${s}`).join('  ')
-  while (true) {
-    const input = (await ask(`\nTop stat?\n  ${statDisplay}  0. any\n> `)).trim()
-    const v = parseChoice(input, STAT_NAMES)
-    if (v === undefined) { console.log('  Invalid choice, try again.'); continue }
-    filters.peakStat = v
-    break
-  }
+  const peakStat = await select('Peak stat?', STAT_NAMES, STAT_PREVIEW)
+  if (peakStat) filters.peakStat = peakStat
+  console.log(`  → ${peakStat ?? 'any'}\n`)
 
   // name
-  const nameInput = (await ask('\nName your buddy (or Enter to skip):\n> ')).trim()
+  const nameInput = await askText('  Name your buddy (or Enter to skip): ')
   const buddyName = nameInput.length > 0 ? nameInput : null
+  if (buddyName) console.log(`  → ${buddyName}\n`)
 
   // estimate & hunt
   const difficulty = estimateAttempts(filters)
-  console.log(`\nHunting... ${difficulty}`)
+  console.log(`\n  Hunting... ${difficulty}`)
 
   const limit = 50_000_000
   let found = null
@@ -379,29 +541,26 @@ async function main() {
     break
   }
 
-  // Clear the progress line
   process.stdout.write('\r' + ' '.repeat(70) + '\r')
 
   if (!found) {
-    console.error(`\nNo match found in ${limit.toLocaleString()} attempts. Try fewer filters.`)
+    console.error(`\nNo match in ${limit.toLocaleString()} attempts. Try fewer filters.`)
     process.exit(1)
   }
 
   const elapsed = ((Date.now() - startMs) / 1000).toFixed(1)
   const nameLabel = buddyName ? `  Name: ${buddyName}\n` : ''
-  console.log(`\nFound after ${found.attempts.toLocaleString()} attempts (${elapsed}s):`)
+  console.log(`\n  Found after ${found.attempts.toLocaleString()} attempts (${elapsed}s):`)
   console.log(nameLabel + display(found.bones))
 
   // confirm
-  const confirm = await ask('Apply this buddy? [y/n] ')
-  rl.close()
+  const answer = await askText('  Apply this buddy? [y/n] ')
 
-  if (confirm.trim().toLowerCase() !== 'y') {
-    console.log('\nNo changes made.')
+  if (answer.toLowerCase() !== 'y') {
+    console.log('\n  No changes made.')
     process.exit(0)
   }
 
-  // inject
   inject(found.userId, buddyName)
   saveResult(found.userId, buddyName, found.bones)
 
