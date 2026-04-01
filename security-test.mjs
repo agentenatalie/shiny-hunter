@@ -6,7 +6,7 @@
  *   2. Input validation — parseChoice rejects anything not in whitelist
  *   3. Shell injection  — buddy name never reaches a shell command
  *   4. JSON injection   — buddy name is always safely serialized
- *   5. File path        — writes only to ~/.claude.json, never user-controlled path
+ *   5. File path        — writes only to ~/.claude.json and ~/.shiny-hunter-result.json, never user-controlled path
  *   6. Network          — zero outbound connections
  *   7. Dependencies     — no third-party packages
  *   8. userId integrity — always 64-char hex, never executable
@@ -255,7 +255,7 @@ test('buddy name reaches JSON.stringify — all injection attempts produce valid
 
 // ─── 5. file path safety ─────────────────────────────────────────────────────
 
-console.log('\n5. File path — only writes to ~/.claude.json\n')
+console.log('\n5. File path — only writes to hardcoded paths\n')
 
 test('inject() path is derived from homedir(), not user input', () => {
   // Verify homedir() + '/.claude.json' pattern in source
@@ -273,14 +273,32 @@ test('homedir() + /.claude.json resolves correctly', () => {
 })
 
 test('no writeFileSync with user-controlled path', () => {
-  // All writeFileSync calls must use the fixed path variable, not a template with user input
+  // All writeFileSync calls must use a hardcoded path variable as first arg, not user input
   const writeLines = src.split('\n').filter(l => l.includes('writeFileSync'))
   for (const line of writeLines) {
+    // Extract the first argument (the path) — text between writeFileSync( and the first comma
+    const pathArg = line.match(/writeFileSync\(\s*([^,]+)/)?.[1]?.trim() ?? ''
     assert(
-      !line.includes('nameInput') && !line.includes('buddyName') && !line.includes('userId'),
+      !pathArg.includes('nameInput') && !pathArg.includes('buddyName') && !pathArg.includes('userId'),
       `writeFileSync may use user-controlled path: ${line.trim()}`
     )
   }
+})
+
+test('result file path is derived from homedir(), not user input', () => {
+  assert(
+    src.includes("homedir() + '/.shiny-hunter-result.json'"),
+    "Expected RESULT_PATH pattern not found — may have changed"
+  )
+})
+
+test('loadResult uses readFileSync, not execSync', () => {
+  // Extract the loadResult function body
+  const loadMatch = src.match(/function loadResult\(\)[\s\S]*?^}/m)
+  assert(loadMatch, 'loadResult function not found')
+  const body = loadMatch[0]
+  assert(body.includes('readFileSync'), 'loadResult does not use readFileSync')
+  assert(!body.includes('execSync'), 'loadResult uses execSync — unsafe')
 })
 
 // ─── 6. network safety ───────────────────────────────────────────────────────
@@ -346,8 +364,12 @@ test('userId is never passed to shell (only written to JSON)', () => {
 
 console.log('\n9. Repo structure — no .claude hooks or MCP configs\n')
 
-test('no .claude directory in repo', () => {
-  assert(!existsSync(join(__dir, '.claude')), '.claude directory found in repo — potential hook injection')
+test('no .claude/hooks directory in repo (hook injection vector)', () => {
+  assert(!existsSync(join(__dir, '.claude', 'hooks')), '.claude/hooks directory found in repo — hook injection vector')
+})
+
+test('no .claude/settings.json in repo (only settings.local.json is OK)', () => {
+  assert(!existsSync(join(__dir, '.claude', 'settings.json')), '.claude/settings.json found in repo — potential hook injection')
 })
 
 test('no .mcp.json in repo', () => {

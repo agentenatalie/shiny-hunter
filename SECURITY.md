@@ -2,7 +2,7 @@
 
 ## Statement
 
-shiny-hunter modifies one field in one local config file (`~/.claude.json`). It makes no network connections, executes no remote code, and cannot be used to inject malware.
+shiny-hunter modifies one field in one local config file (`~/.claude.json`) and saves hunt results to `~/.shiny-hunter-result.json` for the `--restore` flag. It uses cross-platform auth detection (macOS Keychain on Darwin, config-based OAuth elsewhere). It makes no network connections, executes no remote code, and cannot be used to inject malware.
 
 Run the automated test suite yourself to verify:
 
@@ -10,7 +10,7 @@ Run the automated test suite yourself to verify:
 node security-test.mjs
 ```
 
-Expected output: **28 passed, 0 failed.**
+Expected output: **31 passed, 0 failed.**
 
 ---
 
@@ -21,6 +21,7 @@ Expected output: **28 passed, 0 failed.**
 | Reads stdin | Your menu choices only |
 | Reads `~/.claude.json` | To preserve existing settings |
 | Writes `~/.claude.json` | Sets `userID` and optionally `companion.name` |
+| Writes `~/.shiny-hunter-result.json` | Saves last hunt result for `--restore` |
 | Reads macOS Keychain | One fixed entry: `Claude Code-credentials` — only to display a startup hint, never sent anywhere |
 | No network calls | Zero outbound connections |
 | No external dependencies | Only Node.js built-ins |
@@ -75,11 +76,11 @@ homedir() + '/.claude.json'
 | 2 | Input validation | `parseChoice` rejects 13 malicious strings and 1,000 random fuzz inputs |
 | 3 | Shell injection | Buddy name never appears in any shell command |
 | 4 | JSON injection | 11 injection payloads all round-trip cleanly through `JSON.stringify` / `JSON.parse` |
-| 5 | File path | Write path uses `homedir()`, no user-controlled component |
+| 5 | File path | Write path uses `homedir()`, no user-controlled component, result file path safety, `--restore` uses `readFileSync` only |
 | 6 | Network | No http/https/net/fetch imports, no socket calls |
 | 7 | Dependencies | Zero third-party packages in `package.json` |
 | 8 | userId integrity | 1,000 generated IDs are all 64-char hex |
-| 9 | Repo structure | No `.claude` hooks, no `.mcp.json` |
+| 9 | Repo structure | No `.claude/hooks`, no `.claude/settings.json`, no `.mcp.json` |
 
 ---
 
