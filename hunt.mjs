@@ -87,16 +87,12 @@ function rollStats(rng, rarity) {
 
 function rollFrom(rng) {
   const rarity = rollRarity(rng)
+  const species = pick(rng, SPECIES)
+  const eye = pick(rng, EYES)
+  const hat = rarity === 'common' ? 'none' : pick(rng, HATS)
+  const shiny = rng() < 0.01
   const { stats, peak } = rollStats(rng, rarity)
-  const bones = {
-    rarity,
-    species:  pick(rng, SPECIES),
-    eye:      pick(rng, EYES),
-    hat:      rarity === 'common' ? 'none' : pick(rng, HATS),
-    shiny:    rng() < 0.01,
-    stats,
-    peakStat: peak,
-  }
+  const bones = { rarity, species, eye, hat, shiny, stats, peakStat: peak }
   return { bones, inspirationSeed: Math.floor(rng() * 1e9) }
 }
 
