@@ -1,11 +1,13 @@
-# shiny-hunter
+<h1 align="center">shiny-hunter</h1>
 
-[![npm version](https://img.shields.io/npm/v/shiny-hunter)](https://www.npmjs.com/package/shiny-hunter)
-[![node](https://img.shields.io/node/v/shiny-hunter)](https://nodejs.org)
-[![license](https://img.shields.io/github/license/agentenatalie/shiny-hunter)](./LICENSE)
-[![zero dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)]()
+<p align="center">
+  <a href="https://www.npmjs.com/package/shiny-hunter"><img src="https://img.shields.io/npm/v/shiny-hunter" alt="npm version"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/node/v/shiny-hunter" alt="node"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/github/license/agentenatalie/shiny-hunter" alt="license"></a>
+  <img src="https://img.shields.io/badge/dependencies-0-brightgreen" alt="zero dependencies">
+</p>
 
-[English](./README.md)
+<p align="center"><a href="./README.md">English</a></p>
 
 Claude Code 的伙伴是根据你的用户 ID 哈希决定的。你没得选。**直到现在。**
 
