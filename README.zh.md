@@ -13,16 +13,23 @@
 
 ## 快速开始
 
+```bash
 npx shiny-hunter
+```
+
+```bash
 npx shiny-hunter --restore   # 重新应用已保存的伙伴
 npx shiny-hunter --help
+```
 
 或者克隆后直接运行：
 
+```bash
 git clone https://github.com/agentenatalie/shiny-hunter.git
 node shiny-hunter/hunt.mjs
+```
 
-搜索完成后，重启 Claude Code 并输入 /buddy 即可见到你的伙伴。
+搜索完成后，重启 Claude Code 并输入 `/buddy` 即可见到你的伙伴。
 
 ## 可选属性
 
@@ -60,12 +67,14 @@ Claude Code 通过以 userID 为种子的伪随机数生成器来决定伙伴属
 
 如果 Claude Code 在下次启动时覆盖了你的伙伴：
 
-1. 快速修复 -- 运行 npx shiny-hunter --restore 重新注入已保存的伙伴。
-2. 永久修复 (macOS) -- 使用附带的 claude-buddy 包装脚本，它会从 Keychain 提取 OAuth 令牌并通过环境变量传递，从而阻止 Claude 覆盖 userID：
+1. **快速修复** -- 运行 `npx shiny-hunter --restore` 重新注入已保存的伙伴。
+2. **永久修复 (macOS)** -- 使用附带的 `claude-buddy` 包装脚本，它会从 Keychain 提取 OAuth 令牌并通过环境变量传递，从而阻止 Claude 覆盖 `userID`：
+   ```bash
    cp claude-buddy ~/.local/bin/claude-buddy
    chmod 700 ~/.local/bin/claude-buddy
-   之后用 claude-buddy 代替 claude 启动即可。
-3. 手动方式 -- 在启动 Claude 之前，在 shell 环境中设置 CLAUDE_CODE_OAUTH_TOKEN。
+   ```
+   之后用 `claude-buddy` 代替 `claude` 启动即可。
+3. **手动方式** -- 在启动 Claude 之前，在 shell 环境中设置 `CLAUDE_CODE_OAUTH_TOKEN`。
 
 ## 搜索难度参考
 
@@ -81,10 +90,10 @@ Claude Code 通过以 userID 为种子的伪随机数生成器来决定伙伴属
 
 ## 安全性
 
-- 零依赖 -- 仅使用 Node.js 内置模块
-- 无网络请求 -- 一切在本地运行
-- 31 项自动化安全测试 -- 运行 node security-test.mjs 自行验证
-- 详见 SECURITY.md 了解完整安全声明
+- **零依赖** -- 仅使用 Node.js 内置模块
+- **无网络请求** -- 一切在本地运行
+- **31 项自动化安全测试** -- 运行 `node security-test.mjs` 自行验证
+- 详见 [SECURITY.md](./SECURITY.md) 了解完整安全声明
 
 ## 环境要求
 
@@ -93,4 +102,4 @@ Claude Code 通过以 userID 为种子的伪随机数生成器来决定伙伴属
 
 ## 许可证
 
-MIT
+[MIT](./LICENSE)
