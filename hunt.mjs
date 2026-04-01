@@ -54,18 +54,20 @@ function rollStats(rng, rarity) {
     else if (name === dump) stats[name] = Math.max(1,   floor - 10 + Math.floor(rng() * 15))
     else                    stats[name] = floor + Math.floor(rng() * 40)
   }
-  return stats
+  return { stats, peak }
 }
 
 function rollFrom(rng) {
   const rarity = rollRarity(rng)
+  const { stats, peak } = rollStats(rng, rarity)
   const bones = {
     rarity,
-    species: pick(rng, SPECIES),
-    eye:     pick(rng, EYES),
-    hat:     rarity === 'common' ? 'none' : pick(rng, HATS),
-    shiny:   rng() < 0.01,
-    stats:   rollStats(rng, rarity),
+    species:  pick(rng, SPECIES),
+    eye:      pick(rng, EYES),
+    hat:      rarity === 'common' ? 'none' : pick(rng, HATS),
+    shiny:    rng() < 0.01,
+    stats,
+    peakStat: peak,
   }
   return { bones, inspirationSeed: Math.floor(rng() * 1e9) }
 }
@@ -75,11 +77,12 @@ function roll(userId) {
 }
 
 function matches(bones, filters) {
-  if (filters.species && bones.species !== filters.species) return false
-  if (filters.rarity  && bones.rarity  !== filters.rarity)  return false
-  if (filters.eye     && bones.eye     !== filters.eye)     return false
-  if (filters.hat     && bones.hat     !== filters.hat)     return false
-  if (filters.shiny   != null && bones.shiny !== filters.shiny) return false
+  if (filters.species  && bones.species  !== filters.species)  return false
+  if (filters.rarity   && bones.rarity   !== filters.rarity)   return false
+  if (filters.eye      && bones.eye      !== filters.eye)      return false
+  if (filters.hat      && bones.hat      !== filters.hat)      return false
+  if (filters.peakStat && bones.peakStat !== filters.peakStat) return false
+  if (filters.shiny != null && bones.shiny !== filters.shiny)  return false
   return true
 }
 
@@ -119,7 +122,7 @@ function getOAuthToken() {
   }
 }
 
-function inject(userId) {
+function inject(userId, name) {
   const path = homedir() + '/.claude.json'
   let config
   try { config = JSON.parse(readFileSync(path, 'utf8')) }
@@ -128,6 +131,12 @@ function inject(userId) {
   config.userID = userId
   if (config.oauthAccount?.accountUuid) {
     delete config.oauthAccount.accountUuid
+  }
+  if (name) {
+    config.companion = {
+      ...(config.companion ?? {}),
+      name,
+    }
   }
 
   writeFileSync(path, JSON.stringify(config, null, 2))
@@ -167,7 +176,8 @@ function estimateAttempts(f) {
       p *= 1 / HATS.length
     }
   }
-  if (f.eye) p *= 1 / EYES.length
+  if (f.eye)      p *= 1 / EYES.length
+  if (f.peakStat) p *= 1 / STAT_NAMES.length
   const expected = Math.round(1 / p)
   if (expected < 50_000)   return `quick (~${expected.toLocaleString()} attempts)`
   if (expected < 500_000)  return `moderate (~${expected.toLocaleString()} attempts)`
@@ -234,6 +244,20 @@ async function main() {
     break
   }
 
+  // peak stat
+  const statDisplay = STAT_NAMES.map((s, i) => `${i + 1}. ${s}`).join('  ')
+  while (true) {
+    const input = (await ask(`\nTop stat?\n  ${statDisplay}  0. any\n> `)).trim()
+    const v = parseChoice(input, STAT_NAMES)
+    if (v === undefined) { console.log('  Invalid choice, try again.'); continue }
+    filters.peakStat = v
+    break
+  }
+
+  // name
+  const nameInput = (await ask('\nName your buddy (or Enter to skip):\n> ')).trim()
+  const buddyName = nameInput.length > 0 ? nameInput : null
+
   // estimate & hunt
   const difficulty = estimateAttempts(filters)
   console.log(`\nHunting... ${difficulty}`)
@@ -256,8 +280,9 @@ async function main() {
   }
 
   const elapsed = ((Date.now() - startMs) / 1000).toFixed(1)
+  const nameLabel = buddyName ? `  Name: ${buddyName}\n` : ''
   console.log(`\nFound after ${found.attempts.toLocaleString()} attempts (${elapsed}s):`)
-  console.log(display(found.bones))
+  console.log(nameLabel + display(found.bones))
 
   // confirm
   const confirm = await ask('Apply this buddy? [y/n] ')
@@ -269,7 +294,7 @@ async function main() {
   }
 
   // inject
-  inject(found.userId)
+  inject(found.userId, buddyName)
 
   // check for macOS keychain token
   const token = getOAuthToken()
